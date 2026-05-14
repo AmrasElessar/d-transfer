@@ -142,6 +142,25 @@ impl Default for ChecksumAlgo {
     }
 }
 
+/// fsync politikası — adapter dosya finalize ederken hangi seviyede senkron
+/// yapsın? Bölüm 14.6.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FsyncPolicy {
+    /// Hiç fsync yok — hızlı, power-cut'ta veri kaybı kabul.
+    None,
+    /// `sync_data()` + (POSIX'te) parent dir `sync_all()`. Default.
+    DataOnly,
+    /// `sync_all()` — data + metadata.
+    Full,
+}
+
+impl Default for FsyncPolicy {
+    fn default() -> Self {
+        Self::DataOnly
+    }
+}
+
 /// Transfer çağrısının runtime parametreleri (Bölüm 9.3).
 #[derive(Debug, Clone)]
 pub struct TransferOptions {
@@ -157,6 +176,8 @@ pub struct TransferOptions {
     pub overwrite_policy: OverwritePolicy,
     pub preserve_mtime: bool,
     pub max_buffered_chunks: usize,
+    /// Adapter dosya finalize aşamasında bu politikaya uyar (Bölüm 14.6).
+    pub fsync_policy: FsyncPolicy,
 }
 
 impl Default for TransferOptions {
@@ -174,6 +195,7 @@ impl Default for TransferOptions {
             overwrite_policy: OverwritePolicy::Ask,
             preserve_mtime: true,
             max_buffered_chunks: 8,
+            fsync_policy: FsyncPolicy::DataOnly,
         }
     }
 }

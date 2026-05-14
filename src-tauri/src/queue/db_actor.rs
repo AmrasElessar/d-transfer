@@ -73,6 +73,13 @@ pub enum DbCommand {
         state: TransferState,
         ack: oneshot::Sender<Result<Vec<PersistedTransferTask>, DbError>>,
     },
+    /// UI queue panel için tüm transferler — terminal state'ler de dahil
+    /// (kullanıcı "tamamlandı" / "başarısız" satırlarını görmek ister).
+    /// Sıralama: state önceliği (Active önce) + created_at DESC.
+    ListAll {
+        limit: u32,
+        ack: oneshot::Sender<Result<Vec<PersistedTransferTask>, DbError>>,
+    },
     Recover {
         ack: oneshot::Sender<Result<RecoveryReport, DbError>>,
     },
@@ -165,6 +172,22 @@ impl DbActorHandle {
         self.tx
             .send(DbCommand::ListByState {
                 state,
+                ack: ack_tx,
+            })
+            .await
+            .map_err(|_| DbError::ActorClosed)?;
+        ack_rx.await.map_err(|_| DbError::ActorClosed)?
+    }
+
+    /// UI queue panel için tüm transferleri tek sorguda alır.
+    ///
+    /// `limit` 0 ise default 200 kullanılır — kuyruk paneli memory'sini
+    /// bağımlı dosya sayısına bırakmamak için pratik bir cap.
+    pub async fn list_all(&self, limit: u32) -> Result<Vec<PersistedTransferTask>, DbError> {
+        let (ack_tx, ack_rx) = oneshot::channel();
+        self.tx
+            .send(DbCommand::ListAll {
+                limit,
                 ack: ack_tx,
             })
             .await
@@ -306,6 +329,9 @@ fn dispatch(conn: &mut Connection, cmd: DbCommand) {
         }
         DbCommand::ListByState { state, ack } => {
             let _ = ack.send(list_by_state(conn, state));
+        }
+        DbCommand::ListAll { limit, ack } => {
+            let _ = ack.send(list_all(conn, limit));
         }
         DbCommand::Recover { ack } => {
             let _ = ack.send(run_recovery(conn));
@@ -462,6 +488,20 @@ fn list_by_state(
     Ok(out)
 }
 
+/// Sıralama: aktif olanlar başta (`Active`/`Verifying`/`Finalizing`/`Paused`),
+/// sonra bekleyenler (`Queued`), sonra terminal (`Completed`/`Failed`/...).
+/// İkincil anahtar created_at DESC — en son eklenen başta.
+fn list_all(conn: &Connection, limit: u32) -> Result<Vec<PersistedTransferTask>, DbError> {
+    let effective_limit: i64 = if limit == 0 { 200 } else { limit.min(2000) as i64 };
+    let mut stmt = conn.prepare(LIST_ALL_ORDERED)?;
+    let mut rows = stmt.query(params![effective_limit])?;
+    let mut out = Vec::new();
+    while let Some(row) = rows.next()? {
+        out.push(PersistedTransferTask::from_row(row)?);
+    }
+    Ok(out)
+}
+
 // SELECT'ler explicit kolon listesi ile — `from_row` kolon adıyla okuduğu için
 // SELECT * de çalışırdı, ama gerek olmayan I/O'yu önlemek ve şema değişimi
 // sırasında stabilite için açık liste.
@@ -477,6 +517,26 @@ const LIST_BY_STATE: &str = "SELECT id, profile_id, direction, state, priority,
     created_at, updated_at, started_at, completed_at
     FROM transfers WHERE state = ?1
     ORDER BY priority DESC, created_at ASC";
+
+// State priority: active'ler 0, queued 1, paused 2, terminal 3. CASE deyimi
+// SQLite'in stabil sıralama anahtarı olur. created_at DESC ikincil — kullanıcı
+// son eklenen transferi başta görür.
+const LIST_ALL_ORDERED: &str = "SELECT id, profile_id, direction, state, priority,
+    local_path, remote_path, bytes_total, bytes_done, chunk_size,
+    retry_count, last_error, schema_version,
+    created_at, updated_at, started_at, completed_at
+    FROM transfers
+    ORDER BY
+      CASE state
+        WHEN 'active' THEN 0
+        WHEN 'verifying' THEN 0
+        WHEN 'finalizing' THEN 0
+        WHEN 'queued' THEN 1
+        WHEN 'paused' THEN 2
+        ELSE 3
+      END ASC,
+      created_at DESC
+    LIMIT ?1";
 
 // ---------- ConnectionProfile CRUD (actor-internal) ----------
 

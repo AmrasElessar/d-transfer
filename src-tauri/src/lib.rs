@@ -134,6 +134,10 @@ pub fn run() {
             commands::connect_profile,
             commands::disconnect_profile,
             commands::list_remote_dir,
+            commands::list_transfers,
+            commands::enqueue_upload,
+            commands::enqueue_download,
+            commands::cancel_transfer,
         ])
         .setup(move |app| {
             initialize_app_state(app, limit_profile, limits)?;
@@ -235,18 +239,6 @@ fn initialize_app_state(
         root_cancel.clone(),
     ));
     let factory = Arc::new(profiles::LocalAdapterFactory::new());
-    let factory_dyn: Arc<dyn profiles::AdapterFactory> =
-        Arc::clone(&factory) as Arc<dyn profiles::AdapterFactory>;
-
-    let (scheduler, worker) = scheduler::new_scheduler(
-        Arc::clone(&queue),
-        Arc::clone(&engine),
-        factory_dyn,
-        root_cancel.token().clone(),
-    );
-
-    // Scheduler worker — root_cancel iptal olunca temiz kapanır.
-    tauri::async_runtime::spawn(worker.run());
 
     // Credential vault — stateless wrapper, her komutta yeniden Entry kurar.
     // OS keystore arızalı bile olsa start-up'ı bozmayız; hata profile CRUD
@@ -255,6 +247,28 @@ fn initialize_app_state(
 
     // Connection pool — vault'u paylaşır, SFTP password fetch için aynı keystore.
     let connections = Arc::new(profiles::ConnectionManager::new(Arc::clone(&credentials)));
+
+    // Unified factory: scheduler dispatch path'i hem debug LocalAdapterFactory
+    // (start_local_transfer) hem DB-backed profile'lar (enqueue_upload/download)
+    // ile uyumlu çalışsın diye iki kaynağı birleştirir.
+    let unified_factory = Arc::new(profiles::UnifiedAdapterFactory::new(
+        Arc::clone(&factory),
+        Arc::clone(&queue),
+        Arc::clone(&connections),
+    ));
+    let factory_dyn: Arc<dyn profiles::AdapterFactory> =
+        Arc::clone(&unified_factory) as Arc<dyn profiles::AdapterFactory>;
+
+    let (scheduler, worker) = scheduler::new_scheduler(
+        Arc::clone(&queue),
+        Arc::clone(&engine),
+        factory_dyn,
+        Arc::clone(&settings_store),
+        root_cancel.token().clone(),
+    );
+
+    // Scheduler worker — root_cancel iptal olunca temiz kapanır.
+    tauri::async_runtime::spawn(worker.run());
 
     // Rate limiter (Bölüm 16) — adapter'lar her API yanıtında
     // `update_from_headers(profile_id, ...)` çağrısı yapacak.

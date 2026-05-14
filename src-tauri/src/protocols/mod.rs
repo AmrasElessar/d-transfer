@@ -18,6 +18,7 @@ pub use local::LocalAdapter;
 pub use noop::NoopAdapter;
 pub use sftp::SftpAdapter;
 pub use types::{
-    AdapterCapabilities, ListOpts, LocalPath, OverwritePolicy, ProgressSender, ProtocolInfo,
-    RemoteEntry, RemoteEntryKind, RemotePath, TransferOptions, TransferResult, TransferStats,
+    AdapterCapabilities, ChecksumAlgo, FsyncPolicy, ListOpts, LocalPath, OverwritePolicy,
+    ProgressSender, ProtocolInfo, RemoteEntry, RemoteEntryKind, RemotePath, TransferOptions,
+    TransferResult, TransferStats,
 };

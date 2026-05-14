@@ -137,21 +137,49 @@ fn map_io_error(err: std::io::Error, path: &str) -> TransferError {
     }
 }
 
-/// fsync hedef dosya + (POSIX'te) parent dir — Bölüm 14.6 DataOnly + parent dir.
+/// Bölüm 14.6 — fsync politikası. `None` → no-op, `DataOnly` → sync_data +
+/// parent dir sync_all (POSIX'te), `Full` → sync_all + parent dir.
 #[cfg(unix)]
-async fn fsync_with_parent(file: &File, target: &Path) -> std::io::Result<()> {
-    file.sync_data().await?;
-    if let Some(parent) = target.parent() {
-        let dir = File::open(parent).await?;
-        dir.sync_all().await?;
+async fn apply_fsync_policy(
+    file: &File,
+    target: &Path,
+    policy: super::types::FsyncPolicy,
+) -> std::io::Result<()> {
+    use super::types::FsyncPolicy;
+    match policy {
+        FsyncPolicy::None => Ok(()),
+        FsyncPolicy::DataOnly => {
+            file.sync_data().await?;
+            if let Some(parent) = target.parent() {
+                let dir = File::open(parent).await?;
+                dir.sync_all().await?;
+            }
+            Ok(())
+        }
+        FsyncPolicy::Full => {
+            file.sync_all().await?;
+            if let Some(parent) = target.parent() {
+                let dir = File::open(parent).await?;
+                dir.sync_all().await?;
+            }
+            Ok(())
+        }
     }
-    Ok(())
 }
 
 #[cfg(not(unix))]
-async fn fsync_with_parent(file: &File, _target: &Path) -> std::io::Result<()> {
+async fn apply_fsync_policy(
+    file: &File,
+    _target: &Path,
+    policy: super::types::FsyncPolicy,
+) -> std::io::Result<()> {
+    use super::types::FsyncPolicy;
     // Windows: NTFS MoveFileEx atomik; parent dir fsync syscall'ı yok.
-    file.sync_data().await
+    match policy {
+        FsyncPolicy::None => Ok(()),
+        FsyncPolicy::DataOnly => file.sync_data().await,
+        FsyncPolicy::Full => file.sync_all().await,
+    }
 }
 
 #[async_trait]
@@ -307,7 +335,7 @@ impl ProtocolAdapter for LocalAdapter {
 async fn copy_to(
     src: &Path,
     dst: &Path,
-    _opts: &TransferOptions,
+    opts: &TransferOptions,
     tx: ProgressSender,
 ) -> Result<TransferResult, TransferError> {
     let started = Instant::now();
@@ -364,7 +392,7 @@ async fn copy_to(
             .await;
     }
 
-    fsync_with_parent(&writer, &tmp_path)
+    apply_fsync_policy(&writer, &tmp_path, opts.fsync_policy)
         .await
         .map_err(TransferError::Io)?;
     drop(writer);

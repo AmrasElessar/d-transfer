@@ -156,6 +156,39 @@ export interface ListRemoteDirRequest {
   includeHidden: boolean;
 }
 
+/** Rust `commands::EnqueueTransferRequest`. */
+export interface EnqueueTransferRequest {
+  profileId: string;
+  localPath: string;
+  remotePath: string;
+  bytesTotal?: number;
+}
+
+/** Rust `commands::EnqueueTransferResponse`. */
+export interface EnqueueTransferResponse {
+  transferId: string;
+}
+
+/** Rust `commands::TransferDto` camelCase projeksiyonu — queue panel satırı. */
+export interface TransferDto {
+  id: string;
+  profileId: string;
+  direction: TransferDirection;
+  state: TransferState;
+  priority: number;
+  localPath: string;
+  remotePath: string;
+  bytesTotal: number;
+  bytesDone: number;
+  chunkSize: number;
+  retryCount: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
 /** Rust `errors::WireError` camelCase projeksiyonu. */
 export type ErrorCategory =
   | "network"

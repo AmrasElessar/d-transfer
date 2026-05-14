@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
+import { invoke } from "@tauri-apps/api/core";
 import { RecycleScroller } from "vue-virtual-scroller";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import { useRemoteBrowser, type SelectionMode } from "@/composables/useRemoteBrowser";
 import { useProfilesStore } from "@/stores/profiles";
+import { useTransferTargetStore } from "@/stores/transferTargets";
 import { formatBytes, formatModifiedTime } from "@/utils/format";
-import type { RemoteEntryDto } from "@/types";
+import type { EnqueueTransferResponse, RemoteEntryDto } from "@/types";
 
 const { t } = useI18n();
 
@@ -15,6 +17,70 @@ const profilesStore = useProfilesStore();
 const { activeProfile } = storeToRefs(profilesStore);
 
 const browser = useRemoteBrowser();
+const targets = useTransferTargetStore();
+
+watch(
+  () => browser.cwd.value,
+  (v) => targets.setRemoteCwd(v),
+  { immediate: true },
+);
+
+const downloadError = ref<string | null>(null);
+const downloading = ref(false);
+
+const selectedFiles = computed<RemoteEntryDto[]>(() =>
+  browser.entries.value.filter(
+    (e) => browser.selection.value.has(e.path) && e.kind === "file",
+  ),
+);
+
+const canDownload = computed(
+  () =>
+    !!activeProfile.value &&
+    selectedFiles.value.length > 0 &&
+    !!targets.localCwd &&
+    !downloading.value,
+);
+
+function joinLocal(base: string, name: string): string {
+  if (!base) return name;
+  // Windows path detection — drive letter veya backslash içeriyorsa Windows.
+  const isWin = /^[A-Za-z]:[\\/]/.test(base) || base.includes("\\");
+  const sep = isWin ? "\\" : "/";
+  if (base.endsWith("/") || base.endsWith("\\")) return base + name;
+  return `${base}${sep}${name}`;
+}
+
+async function downloadSelection() {
+  if (!activeProfile.value) {
+    downloadError.value = t("transfer.errors.noActiveProfile");
+    return;
+  }
+  if (!targets.localCwd) {
+    downloadError.value = t("transfer.errors.noLocalDir");
+    return;
+  }
+  if (selectedFiles.value.length === 0) return;
+  downloadError.value = null;
+  downloading.value = true;
+  try {
+    for (const entry of selectedFiles.value) {
+      const localPath = joinLocal(targets.localCwd, entry.name);
+      await invoke<EnqueueTransferResponse>("enqueue_download", {
+        request: {
+          profileId: activeProfile.value.id,
+          localPath,
+          remotePath: entry.path,
+          bytesTotal: entry.size ?? 0,
+        },
+      });
+    }
+  } catch (err) {
+    downloadError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    downloading.value = false;
+  }
+}
 
 async function toggleHidden() {
   await browser.setIncludeHidden(!browser.includeHidden.value);
@@ -184,6 +250,17 @@ const ROW_HEIGHT = 24;
         >
           ⊙
         </button>
+        <!-- Download selection → LocalPane'in cwd'sine -->
+        <button
+          type="button"
+          class="rounded border border-border-muted bg-status-info/15 px-2 py-0.5 text-xs font-medium text-status-info hover:bg-status-info/25 disabled:cursor-not-allowed disabled:opacity-40"
+          :title="t('transfer.actions.download')"
+          :aria-label="t('transfer.actions.download')"
+          :disabled="!canDownload"
+          @click="downloadSelection()"
+        >
+          ↓ {{ selectedFiles.length > 0 ? `(${selectedFiles.length})` : "" }}
+        </button>
       </div>
 
       <!-- Breadcrumb (yalnızca bağlıyken) -->
@@ -218,6 +295,13 @@ const ROW_HEIGHT = 24;
       role="alert"
     >
       {{ t("remoteBrowser.errorPrefix") }}: {{ browser.error.value }}
+    </div>
+    <div
+      v-if="downloadError"
+      class="shrink-0 border-b border-status-danger/40 bg-status-danger/10 px-3 py-1.5 text-xs text-status-danger"
+      role="alert"
+    >
+      {{ downloadError }}
     </div>
 
     <!-- No profile selected -->

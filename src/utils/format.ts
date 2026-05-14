@@ -62,3 +62,38 @@ export function formatModifiedTime(unixMs: number | null | undefined): string {
     day: "2-digit",
   });
 }
+
+/**
+ * Transfer hızı (byte/sn). MiB/s biriminde 1 ondalık; sıfır veya bilinmeyen
+ * "—".
+ */
+export function formatSpeed(bps: number | null | undefined): string {
+  if (bps === null || bps === undefined) return "—";
+  if (!Number.isFinite(bps) || bps <= 0) return "—";
+  return `${formatBytes(bps)}/s`;
+}
+
+/**
+ * Kalan süre — saniye cinsinden. UI dostu kısaltma: "12s", "3m 5s", "1h 12m".
+ */
+export function formatEta(secs: number | null | undefined): string {
+  if (secs === null || secs === undefined) return "—";
+  if (!Number.isFinite(secs) || secs < 0) return "—";
+  const total = Math.round(secs);
+  if (total < 60) return `${total}s`;
+  if (total < 3600) {
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  }
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+/** İlerleme yüzdesi 0-100 arası tam sayı; total 0 ise null. */
+export function progressPercent(done: number, total: number): number | null {
+  if (total <= 0) return null;
+  const pct = (done / total) * 100;
+  return Math.min(100, Math.max(0, Math.round(pct)));
+}

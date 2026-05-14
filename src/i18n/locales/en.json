@@ -51,11 +51,25 @@
     "emptyDir": "This directory is empty",
     "errorPrefix": "Error"
   },
+  "transfer": {
+    "actions": {
+      "upload": "Upload selection",
+      "download": "Download selection"
+    },
+    "errors": {
+      "noActiveProfile": "No active profile",
+      "noLocalDir": "Local destination unset"
+    }
+  },
   "queue": {
     "title": "Transfer queue",
     "empty": "No transfers in queue",
     "activeCount": "Active: {count}",
     "queuedCount": "Queued: {count}",
+    "clearTerminal": "Clear completed",
+    "cancel": "Cancel",
+    "pause": "Pause",
+    "resume": "Resume",
     "state": {
       "queued": "Queued",
       "active": "Active",

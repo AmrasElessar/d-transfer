@@ -420,6 +420,202 @@ pub fn home_dir() -> Option<String> {
 }
 
 // ============================================================================
+// Queue / Transfer IPC (Bölüm 15).
+// ============================================================================
+//
+// UI'ın QueuePanel'da gösterdiği satırlar. `list_transfers` initial load
+// içindir; sonradan engine event akışı (transferStateChanged/Progress/...) ile
+// güncellenir.
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferDto {
+    pub id: String,
+    pub profile_id: String,
+    pub direction: TransferDirection,
+    pub state: TransferState,
+    pub priority: i32,
+    pub local_path: String,
+    pub remote_path: String,
+    pub bytes_total: u64,
+    pub bytes_done: u64,
+    pub chunk_size: u64,
+    pub retry_count: u32,
+    pub last_error: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+impl From<PersistedTransferTask> for TransferDto {
+    fn from(t: PersistedTransferTask) -> Self {
+        Self {
+            id: t.id.to_string(),
+            profile_id: t.profile_id.to_string(),
+            direction: t.direction,
+            state: t.state,
+            priority: t.priority,
+            local_path: t.local_path.to_string_lossy().into_owned(),
+            remote_path: t.remote_path,
+            bytes_total: t.bytes_total,
+            bytes_done: t.bytes_done,
+            chunk_size: t.chunk_size as u64,
+            retry_count: t.retry_count,
+            last_error: t.last_error,
+            created_at: t.created_at.to_rfc3339(),
+            updated_at: t.updated_at.to_rfc3339(),
+            started_at: t.started_at.map(|d| d.to_rfc3339()),
+            completed_at: t.completed_at.map(|d| d.to_rfc3339()),
+        }
+    }
+}
+
+/// Queue panel initial load. Default limit 200; UI 200'ü aşarsa kaydırma.
+#[tauri::command]
+pub async fn list_transfers(
+    limit: Option<u32>,
+    state: State<'_, AppState>,
+) -> Result<Vec<TransferDto>, TransferError> {
+    let rows = state
+        .queue
+        .list_all(limit.unwrap_or(200))
+        .await
+        .map_err(|e| TransferError::Protocol {
+            message: format!("list_transfers failed: {e}"),
+        })?;
+    Ok(rows.into_iter().map(TransferDto::from).collect())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnqueueTransferRequest {
+    pub profile_id: Uuid,
+    pub local_path: String,
+    pub remote_path: String,
+    /// `bytes_total` UI'da biliniyorsa (upload local stat'tan, download remote
+    /// list'ten) önceden bildirilir → progress bar hemen yüzde gösterir.
+    /// Bilinmiyorsa 0; engine ilk progress tick'inde günceller.
+    #[serde(default)]
+    pub bytes_total: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnqueueTransferResponse {
+    pub transfer_id: String,
+}
+
+/// Yardımcı: yeni `PersistedTransferTask` üret + scheduler'a submit et.
+/// Submit'ten dönen oneshot waiter **kasıtlı olarak drop edilir** — UI fire
+/// and forget kullanır, completion engine-event üzerinden gelir.
+async fn enqueue_task(
+    state: &AppState,
+    profile_id: Uuid,
+    direction: TransferDirection,
+    local_path: String,
+    remote_path: String,
+    bytes_total: u64,
+) -> Result<EnqueueTransferResponse, TransferError> {
+    // Profile var mı? UnifiedAdapterFactory zaten dispatch sırasında build
+    // edecek ama burada erken doğrulama → kullanıcıya hızlı hata feedback'i.
+    let profile = state
+        .queue
+        .profile_get(profile_id)
+        .await
+        .map_err(|e| TransferError::Protocol {
+            message: format!("profile lookup failed: {e}"),
+        })?;
+    if profile.is_none() && !state.factory.has(profile_id) {
+        return Err(TransferError::NotFound {
+            path: profile_id.to_string(),
+        });
+    }
+
+    let chunk_size_bytes = (state.settings.snapshot().default_chunk_size_mb as usize)
+        .saturating_mul(1024 * 1024);
+    let now = Utc::now();
+    let task = PersistedTransferTask {
+        id: Uuid::new_v4(),
+        profile_id,
+        direction,
+        state: TransferState::Queued,
+        priority: 0,
+        local_path: PathBuf::from(&local_path),
+        remote_path: remote_path.clone(),
+        bytes_total,
+        bytes_done: 0,
+        chunk_size: chunk_size_bytes,
+        retry_count: 0,
+        last_error: None,
+        schema_version: 1,
+        created_at: now,
+        updated_at: now,
+        started_at: None,
+        completed_at: None,
+    };
+    let transfer_id = task.id;
+    // Waiter'ı drop ediyoruz; UI engine event'leriyle tamamlanmayı takip eder.
+    let _waiter = state.scheduler.submit(task).await?;
+
+    Ok(EnqueueTransferResponse {
+        transfer_id: transfer_id.to_string(),
+    })
+}
+
+#[tauri::command]
+pub async fn enqueue_upload(
+    request: EnqueueTransferRequest,
+    state: State<'_, AppState>,
+) -> Result<EnqueueTransferResponse, TransferError> {
+    enqueue_task(
+        &state,
+        request.profile_id,
+        TransferDirection::Upload,
+        request.local_path,
+        request.remote_path,
+        request.bytes_total,
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn enqueue_download(
+    request: EnqueueTransferRequest,
+    state: State<'_, AppState>,
+) -> Result<EnqueueTransferResponse, TransferError> {
+    enqueue_task(
+        &state,
+        request.profile_id,
+        TransferDirection::Download,
+        request.local_path,
+        request.remote_path,
+        request.bytes_total,
+    )
+    .await
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CancelTransferResponse {
+    /// `true` ise scheduler aktif transferi buldu ve cancel sinyali yolladı;
+    /// `false` zaten terminal state'te idi.
+    pub cancelled: bool,
+}
+
+/// Aktif (Active/Verifying/Finalizing) bir transferi iptal et. Engine
+/// cooperative cancellation kullanır — sinyal ulaşana kadar geçen kısa süre
+/// içinde transfer biraz daha veri yazmış olabilir.
+#[tauri::command]
+pub async fn cancel_transfer(
+    transfer_id: Uuid,
+    state: State<'_, AppState>,
+) -> Result<CancelTransferResponse, TransferError> {
+    let cancelled = state.scheduler.cancel_transfer(transfer_id);
+    Ok(CancelTransferResponse { cancelled })
+}
+
+// ============================================================================
 // ConnectionProfile IPC (Bölüm 25).
 // ============================================================================
 //

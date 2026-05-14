@@ -51,11 +51,25 @@
     "emptyDir": "Bu dizinde dosya yok",
     "errorPrefix": "Hata"
   },
+  "transfer": {
+    "actions": {
+      "upload": "Seçimi yükle",
+      "download": "Seçimi indir"
+    },
+    "errors": {
+      "noActiveProfile": "Aktif profil yok",
+      "noLocalDir": "Yerel hedef klasör belirsiz"
+    }
+  },
   "queue": {
     "title": "Transfer kuyruğu",
     "empty": "Kuyrukta transfer yok",
     "activeCount": "Aktif: {count}",
     "queuedCount": "Bekleyen: {count}",
+    "clearTerminal": "Tamamlananları temizle",
+    "cancel": "İptal et",
+    "pause": "Duraklat",
+    "resume": "Devam et",
     "state": {
       "queued": "Kuyrukta",
       "active": "Aktif",

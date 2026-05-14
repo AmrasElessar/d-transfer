@@ -30,12 +30,16 @@ use tokio::time::interval;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
+use crate::cancellation::TransferCancellation;
 use crate::engine::{TransferEngine, TransferRequest};
 use crate::errors::{TransferError, WireError};
 use crate::events::TransferState;
 use crate::profiles::AdapterFactory;
-use crate::protocols::{LocalPath, RemotePath};
+use crate::protocols::{FsyncPolicy as AdapterFsyncPolicy, LocalPath, RemotePath, TransferOptions};
 use crate::queue::{DbActorHandle, DbError, PersistedTransferTask};
+use crate::settings::{
+    ChecksumAlgo as SettingsChecksum, FsyncPolicy as SettingsFsyncPolicy, SettingsStore,
+};
 
 /// Per-transfer outcome (scheduler tamamladığında IPC waiter'a gönderilir).
 #[derive(Debug, Clone)]
@@ -53,6 +57,11 @@ pub struct TransferOutcome {
 pub struct QueueScheduler {
     queue: Arc<DbActorHandle>,
     waiters: Arc<Mutex<HashMap<Uuid, oneshot::Sender<TransferOutcome>>>>,
+    /// Active transferler için cancellation handle'ları. dispatch'in
+    /// `handle.wait().await`'unu cancel etmenin yolu — engine zaten cooperative
+    /// cancellation kullanıyor (Bölüm 32.1), token cancel'ı dispatch loop'una
+    /// dönerek `TransferError::Cancelled` üretir.
+    cancellations: Arc<Mutex<HashMap<Uuid, TransferCancellation>>>,
     notify_tx: mpsc::Sender<()>,
 }
 
@@ -62,22 +71,32 @@ pub struct QueueSchedulerWorker {
     engine: Arc<TransferEngine>,
     factory: Arc<dyn AdapterFactory>,
     waiters: Arc<Mutex<HashMap<Uuid, oneshot::Sender<TransferOutcome>>>>,
+    cancellations: Arc<Mutex<HashMap<Uuid, TransferCancellation>>>,
+    settings: Arc<SettingsStore>,
     notify_rx: mpsc::Receiver<()>,
     cancel: CancellationToken,
 }
 
 /// Scheduler'ı kur. Worker ayrı bir task'te `run()` ile spawn edilir.
+///
+/// `settings` — `AppSettings.default_chunk_size_mb`, `default_max_inflight_mb`,
+/// `bandwidth_limit_bps`, `verify_checksum` her dispatch'te live okunur;
+/// `max_concurrent_transfers` worker yapısında **henüz uygulanmıyor** (dispatch
+/// sıralı, Faz 5 parallel dispatch ile gelecek).
 pub fn new_scheduler(
     queue: Arc<DbActorHandle>,
     engine: Arc<TransferEngine>,
     factory: Arc<dyn AdapterFactory>,
+    settings: Arc<SettingsStore>,
     cancel: CancellationToken,
 ) -> (QueueScheduler, QueueSchedulerWorker) {
     let (notify_tx, notify_rx) = mpsc::channel::<()>(8);
     let waiters = Arc::new(Mutex::new(HashMap::new()));
+    let cancellations = Arc::new(Mutex::new(HashMap::new()));
     let scheduler = QueueScheduler {
         queue: Arc::clone(&queue),
         waiters: Arc::clone(&waiters),
+        cancellations: Arc::clone(&cancellations),
         notify_tx,
     };
     let worker = QueueSchedulerWorker {
@@ -85,10 +104,37 @@ pub fn new_scheduler(
         engine,
         factory,
         waiters,
+        cancellations,
+        settings,
         notify_rx,
         cancel,
     };
     (scheduler, worker)
+}
+
+/// Mevcut `AppSettings` snapshot'ından dispatch için `TransferOptions` üret.
+/// Live okuma — settings değişince bir sonraki dispatch yeni değerleri alır.
+fn build_transfer_options(settings: &SettingsStore) -> TransferOptions {
+    let snap = settings.snapshot();
+    let chunk_size = (snap.default_chunk_size_mb as usize).saturating_mul(1024 * 1024);
+    let max_inflight = (snap.default_max_inflight_mb as usize).saturating_mul(1024 * 1024);
+    let checksum = match snap.verify_checksum {
+        SettingsChecksum::None => crate::protocols::types::ChecksumAlgo::None,
+        SettingsChecksum::Sha256 => crate::protocols::types::ChecksumAlgo::Sha256,
+        SettingsChecksum::XxHash3 => crate::protocols::types::ChecksumAlgo::XxHash3,
+    };
+    let fsync = match snap.fsync_policy {
+        SettingsFsyncPolicy::None => AdapterFsyncPolicy::None,
+        SettingsFsyncPolicy::DataOnly => AdapterFsyncPolicy::DataOnly,
+        SettingsFsyncPolicy::Full => AdapterFsyncPolicy::Full,
+    };
+    let mut opts = TransferOptions::default();
+    opts.chunk_size = chunk_size.max(64 * 1024); // hardcoded floor: 64 KiB
+    opts.max_inflight_bytes = max_inflight.max(opts.chunk_size);
+    opts.speed_limit_bps = snap.bandwidth_limit_bps;
+    opts.verify_checksum = checksum;
+    opts.fsync_policy = fsync;
+    opts
 }
 
 impl QueueScheduler {
@@ -115,6 +161,21 @@ impl QueueScheduler {
     /// Manuel uyandırma (örn. eski abandoned task'leri restart için).
     pub fn notify(&self) {
         let _ = self.notify_tx.try_send(());
+    }
+
+    /// Aktif bir transferi iptal et. Engine cooperative cancellation kullanır
+    /// (Bölüm 32.1) — token cancel olduğunda transfer task `Cancelled` ile
+    /// biter ve scheduler finalize'da DB'yi `Cancelled` state'ine çeker.
+    ///
+    /// `true` = registry'de bulundu ve cancel sinyali yollandı.
+    /// `false` = transfer artık aktif değil (zaten bitmiş veya hiç başlamamış).
+    pub fn cancel_transfer(&self, transfer_id: Uuid) -> bool {
+        let guard = self.cancellations.lock().expect("cancellations mutex poisoned");
+        if let Some(cancel) = guard.get(&transfer_id) {
+            cancel.cancel();
+            return true;
+        }
+        false
     }
 }
 
@@ -193,16 +254,38 @@ impl QueueSchedulerWorker {
 
         // task.id'yi engine'e geçirmek için TransferRequest::new() sonrası id
         // override ediyoruz (pub field — Faz 3 sade yaklaşım).
+        let options = build_transfer_options(&self.settings);
         let mut request = TransferRequest::new(
             direction,
             LocalPath::new(local_path),
             RemotePath::new(remote_path),
             adapter,
-        );
+        )
+        .with_options(options);
         request.id = transfer_id;
 
         let handle = self.engine.submit(request);
+        // Cancel registry'sine kayıt — UI bu noktadan itibaren cancel sinyali
+        // yollayabilir, engine cooperative drop eder.
+        {
+            let mut guard = self
+                .cancellations
+                .lock()
+                .expect("cancellations mutex poisoned");
+            guard.insert(transfer_id, handle.cancellation_handle());
+        }
+
         let result = handle.wait().await;
+
+        // Wait bitince registry'den kaldır (terminal state'e ulaşıldı).
+        {
+            let mut guard = self
+                .cancellations
+                .lock()
+                .expect("cancellations mutex poisoned");
+            guard.remove(&transfer_id);
+        }
+
         let duration_ms = started.elapsed().as_millis() as u64;
 
         match result {
@@ -323,6 +406,16 @@ mod tests {
         }
     }
 
+    fn fresh_settings() -> Arc<SettingsStore> {
+        let dir = tempdir().unwrap();
+        // tempdir leak: SettingsStore yalnızca path'i tutar; testler kısa sürer.
+        // tempdir Drop'u env temizler ama burada testlerin yaşam süresinden
+        // bağımsız tutmak için path'i taşıyoruz.
+        let path = dir.path().to_path_buf();
+        std::mem::forget(dir);
+        Arc::new(SettingsStore::load_or_init(&path).expect("settings init"))
+    }
+
     #[tokio::test]
     async fn submit_dispatches_through_engine_and_updates_db() {
         // Setup stack.
@@ -342,6 +435,7 @@ mod tests {
             Arc::clone(&queue),
             Arc::clone(&engine),
             factory_dyn,
+            fresh_settings(),
             cancel_token,
         );
         let worker_handle = tokio::spawn(worker.run());
@@ -391,8 +485,13 @@ mod tests {
         let engine = Arc::new(TransferEngine::new(Arc::clone(&bus), cancel.clone()));
         let factory: Arc<dyn AdapterFactory> = Arc::new(LocalAdapterFactory::new());
 
-        let (scheduler, worker) =
-            new_scheduler(Arc::clone(&queue), engine, factory, cancel.token().clone());
+        let (scheduler, worker) = new_scheduler(
+            Arc::clone(&queue),
+            engine,
+            factory,
+            fresh_settings(),
+            cancel.token().clone(),
+        );
         let worker_handle = tokio::spawn(worker.run());
 
         // Profile registry'ye eklenmeyen bir id ile task.

@@ -84,6 +84,14 @@ impl TransferHandle {
         self.cancellation.is_cancelled()
     }
 
+    /// Sahip alt-sistem (scheduler) handle'ı `wait()` ile tüketmeden önce
+    /// kendi cancel registry'sine kayıt etmek için clone alır. `TransferHandle`
+    /// kendisi `Clone` değil (JoinHandle move-only), ama içerdeki cancellation
+    /// token zaten `Clone` ve sahiplik paylaşılabilir.
+    pub fn cancellation_handle(&self) -> crate::cancellation::TransferCancellation {
+        self.cancellation.clone()
+    }
+
     pub async fn wait(self) -> Result<TransferResult, TransferError> {
         match self.join.await {
             Ok(result) => result,

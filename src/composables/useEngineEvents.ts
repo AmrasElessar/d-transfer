@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted } from "vue";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useLiveProgressStore } from "@/stores/liveProgress";
+import { useQueueStore } from "@/stores/queue";
 import type { EngineEvent } from "@/types";
 
 /**
@@ -8,6 +9,11 @@ import type { EngineEvent } from "@/types";
  * bridge (lib.rs setup). App lifecycle boyunca yalnızca bir kez bağlanır;
  * birden çok bileşen `useEngineEvents()` çağırsa bile gerçek `listen()` tek
  * sefer kurulur.
+ *
+ * Event'i iki store'a forward eder:
+ * - `queue` — canonical satır listesi (state + bytes + error); QueuePanel okur.
+ * - `liveProgress` — yüksek frekanslı speed/eta cache; ileride TitleBar
+ *   overlay / spark line tüketebilir.
  */
 let mounted = false;
 let unlisten: UnlistenFn | null = null;
@@ -18,12 +24,14 @@ function isTauriEnv(): boolean {
 
 export function useEngineEvents() {
   const live = useLiveProgressStore();
+  const queue = useQueueStore();
 
   async function start(): Promise<void> {
     if (mounted) return;
     if (!isTauriEnv()) return;
     try {
       unlisten = await listen<EngineEvent>("engine-event", (event) => {
+        queue.applyEvent(event.payload);
         live.apply(event.payload);
       });
       mounted = true;

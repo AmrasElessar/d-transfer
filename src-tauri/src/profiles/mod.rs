@@ -30,6 +30,7 @@ use uuid::Uuid;
 
 use crate::errors::TransferError;
 use crate::protocols::{LocalAdapter, ProtocolAdapter};
+use crate::queue::DbActorHandle;
 
 /// QueueScheduler'ın dispatch sırasında adapter alabilmesi için trait.
 ///
@@ -72,6 +73,15 @@ impl LocalAdapterFactory {
             .expect("local-profiles mutex poisoned")
             .len()
     }
+
+    /// `UnifiedAdapterFactory` debug profile'ı önce kontrol etsin diye —
+    /// `Mutex` lock'unu dışarı sızdırmadan boolean cevap verir.
+    pub fn has(&self, profile_id: Uuid) -> bool {
+        self.profiles
+            .lock()
+            .expect("local-profiles mutex poisoned")
+            .contains_key(&profile_id)
+    }
 }
 
 #[async_trait]
@@ -93,6 +103,62 @@ impl AdapterFactory for LocalAdapterFactory {
             .connect(&json!({ "root": root.to_string_lossy().into_owned() }))
             .await?;
         Ok(Arc::new(adapter))
+    }
+}
+
+/// Birleşik adapter factory — scheduler dispatch path'i için.
+///
+/// İki kaynağı sırayla deniyor:
+///
+/// 1. `LocalAdapterFactory` in-memory map (`start_local_transfer` debug akışı
+///    için geçici profile_id'ler).
+/// 2. `DbActorHandle.profile_get(profile_id)` → `ConnectionManager.get_or_connect`
+///    (UI'dan kalıcı profile ile başlatılan transferler).
+///
+/// `ConnectionManager` adapter cache'ini paylaşır; bu, listing için açılmış
+/// SSH bağlantısının transfer dispatch sırasında da yeniden kullanılması
+/// demek — handshake maliyeti tek seferdir.
+pub struct UnifiedAdapterFactory {
+    local: Arc<LocalAdapterFactory>,
+    queue: Arc<DbActorHandle>,
+    connections: Arc<ConnectionManager>,
+}
+
+impl UnifiedAdapterFactory {
+    pub fn new(
+        local: Arc<LocalAdapterFactory>,
+        queue: Arc<DbActorHandle>,
+        connections: Arc<ConnectionManager>,
+    ) -> Self {
+        Self {
+            local,
+            queue,
+            connections,
+        }
+    }
+}
+
+#[async_trait]
+impl AdapterFactory for UnifiedAdapterFactory {
+    async fn build(&self, profile_id: Uuid) -> Result<Arc<dyn ProtocolAdapter>, TransferError> {
+        // 1) In-memory debug factory'sinde varsa onu kullan (eski test akışları).
+        if self.local.has(profile_id) {
+            return self.local.build(profile_id).await;
+        }
+
+        // 2) DB'den profile çek + ConnectionManager üzerinden adapter al/oluştur.
+        let profile = self
+            .queue
+            .profile_get(profile_id)
+            .await
+            .map_err(|e| TransferError::Protocol {
+                message: format!("profile lookup failed: {e}"),
+            })?
+            .ok_or_else(|| TransferError::NotFound {
+                path: profile_id.to_string(),
+            })?;
+
+        self.connections.get_or_connect(&profile).await
     }
 }
 

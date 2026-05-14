@@ -1,16 +1,81 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
+import { storeToRefs } from "pinia";
 import { RecycleScroller } from "vue-virtual-scroller";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import { useLocalBrowser, type SelectionMode } from "@/composables/useLocalBrowser";
+import { useProfilesStore } from "@/stores/profiles";
+import { useTransferTargetStore } from "@/stores/transferTargets";
 import { formatBytes, formatModifiedTime } from "@/utils/format";
-import type { LocalEntry } from "@/types";
+import type { EnqueueTransferResponse, LocalEntry } from "@/types";
 
 const { t } = useI18n();
 
 const browser = useLocalBrowser();
+const profilesStore = useProfilesStore();
+const { activeProfile } = storeToRefs(profilesStore);
+const targets = useTransferTargetStore();
+
+// Pane'in cwd'sini transferTarget store'una aynalayalım — RemotePane'in
+// Download butonu hedef yerel klasörü buradan okur.
+watch(
+  () => browser.cwd.value,
+  (v) => targets.setLocalCwd(v),
+  { immediate: true },
+);
+
+const uploadError = ref<string | null>(null);
+const uploading = ref(false);
+
+// Sadece dosya seçimleri yüklenebilir (klasör recursive upload henüz yok).
+const selectedFiles = computed<LocalEntry[]>(() =>
+  browser.entries.value.filter(
+    (e) => browser.selection.value.has(e.path) && e.kind === "file",
+  ),
+);
+
+const canUpload = computed(
+  () =>
+    !!activeProfile.value &&
+    selectedFiles.value.length > 0 &&
+    !uploading.value,
+);
+
+function joinRemote(base: string, name: string): string {
+  if (!base || base === "" || base === ".") return name;
+  if (base.endsWith("/")) return base + name;
+  return `${base}/${name}`;
+}
+
+async function uploadSelection() {
+  if (!activeProfile.value) {
+    uploadError.value = t("transfer.errors.noActiveProfile");
+    return;
+  }
+  if (selectedFiles.value.length === 0) return;
+  uploadError.value = null;
+  uploading.value = true;
+  try {
+    for (const entry of selectedFiles.value) {
+      const remote = joinRemote(targets.remoteCwd, entry.name);
+      await invoke<EnqueueTransferResponse>("enqueue_upload", {
+        request: {
+          profileId: activeProfile.value.id,
+          localPath: entry.path,
+          remotePath: remote,
+          bytesTotal: entry.size ?? 0,
+        },
+      });
+    }
+    // Seçimi koruyoruz — kullanıcı aynı dosyaları başka yere de gönderebilir.
+  } catch (err) {
+    uploadError.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    uploading.value = false;
+  }
+}
 
 // Drive dropdown panel görünürlüğü — native <select> yasak (Bölüm 19.5),
 // custom button + listbox kullanıyoruz.
@@ -209,6 +274,17 @@ const ROW_HEIGHT = 24;
         >
           ⊙
         </button>
+        <!-- Upload selection → remote pane'in cwd'sine -->
+        <button
+          type="button"
+          class="rounded border border-border-muted bg-accent-default/15 px-2 py-0.5 text-xs font-medium text-accent-default hover:bg-accent-default/25 disabled:cursor-not-allowed disabled:opacity-40"
+          :title="t('transfer.actions.upload')"
+          :aria-label="t('transfer.actions.upload')"
+          :disabled="!canUpload"
+          @click="uploadSelection()"
+        >
+          ↑ {{ selectedFiles.length > 0 ? `(${selectedFiles.length})` : "" }}
+        </button>
         <!-- Drive selector (Windows: A-Z; POSIX: tek kök) -->
         <div class="relative">
           <button
@@ -273,6 +349,13 @@ const ROW_HEIGHT = 24;
       role="alert"
     >
       {{ t("localBrowser.errorPrefix") }}: {{ browser.error.value }}
+    </div>
+    <div
+      v-if="uploadError"
+      class="shrink-0 border-b border-status-danger/40 bg-status-danger/10 px-3 py-1.5 text-xs text-status-danger"
+      role="alert"
+    >
+      {{ uploadError }}
     </div>
 
     <!-- Body -->
