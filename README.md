@@ -11,6 +11,20 @@
 
 </div>
 
+## 🎬 Demo
+
+<div align="center">
+
+> 🎥 **Demo video coming soon** — pre-alpha aşamasında olduğundan resmi tanıtım videosu henüz yok. v1.0 release ile birlikte showcase video + ekran görüntüleri yayınlanacak.
+>
+> *Demo video coming soon — as the project is in pre-alpha, an official showcase is not yet recorded. A walkthrough video plus screenshots will be published alongside the v1.0 release.*
+
+<sub>Mimari + bitenler ekran görüntüleri için: [Şu ana kadar yapılanlar](#-şu-ana-kadar-yapılanlar--whats-done-so-far) · [Teknik döküman v2.1](./dtransfer-teknik-dokuman-v2_1.md)</sub>
+
+</div>
+
+---
+
 <div align="center">
 
 [![License: GPL v3+](https://img.shields.io/badge/License-GPL_v3+-blue.svg?style=flat-square)](LICENSE)
@@ -114,6 +128,41 @@ D-Transfer is **not** trying to replace FileZilla. Its lane is narrower: predict
 3. **Explicit non-goals** — FTP/FTPS is deliberately out (engineering maturity); the plugin system is v2+; continuous remote-directory sync (rsync-like) is out. Conscious narrowing keeps guarantees crisp.
 
 For detailed guarantees and **non-guarantees**, see [Technical doc Section 5](./dtransfer-teknik-dokuman-v2_1.md).
+
+</details>
+
+---
+
+## 🚀 İlk Adımlar / Quick Start
+
+> ⚠️ Pre-alpha: henüz binary release yok. Aşağıdaki akış v1.0 sonrası kurulan istemci için tipik kullanım yolculuğunu özetler; bugün için **kaynaktan derleme** gerekir ([Kurulum](#-kurulum--installation) bölümüne bak).
+
+Kurulumdan sonra D-Transfer'i ilk açtığında izlemen gereken **5 adım**:
+
+1. **İndir & kur** — v1.0 release sonrası: GitHub Releases sayfasından Windows için MSI, Linux için AppImage / `.deb` indir → çift tık ile kur. Bugün için: [Kurulum](#-kurulum--installation) bölümündeki `pnpm tauri:build` ile bundle üret.
+2. **Uygulamayı aç** — İlk açılışta `settings.json` + `queue.db` + (opt-in) `audit.db` kullanıcı veri dizininde oluşur (Windows: `%APPDATA%\d-transfer\`, Linux: `~/.config/d-transfer/`). Tema, dil (TR/EN) ve `LimitProfile` (LowMemory / Desktop / Workstation / Server / Custom) **Ayarlar**'dan seçilebilir.
+3. **İlk profili tanımla** — Sol kenar çubuğunda **+ Profil** → SFTP / Local seç → host, port, kullanıcı adı, parola veya private key gir. **Test connection** capability probe çalıştırır; parola OS-native vault'a (Credential Manager / Keychain / Secret Service) yazılır, UI plaintext sır görmez.
+4. **İlk transferi başlat** — Çift pane'de sol = yerel, sağ = uzak. Dosyayı seç → **transfer** butonu (veya v1.0'da drag-drop). Görev kuyruğa düşer; `ProgressAggregator` 250 ms batched event yayar; `.dtransfer_tmp` üzerinden yazılır → fsync → atomic rename.
+5. **Doğrula** — Transfer tamamlandığında durum `Verifying → Completed` olur (checksum mod aktifse hash karşılaştırılır). Power-cut testi: ortada uygulamayı kapat → tekrar aç → görev `Active → Queued`'a deterministik döner, yarım dosya kalmaz.
+
+> 💡 Detaylı ayar / şema referansı: [`dtransfer-teknik-dokuman-v2_1.md`](./dtransfer-teknik-dokuman-v2_1.md) — Bölüm 9 (kuyruk), Bölüm 13 (encryption), Bölüm 30 (limits).
+> 💡 Sorun yaşarsan: **Ayarlar → Diagnostics → Bundle export** (PII filtreli `tracing` çıktısı + `RuntimeMetrics` snapshot).
+
+<details>
+<summary>🇬🇧 Quick Start (English)</summary>
+
+> ⚠️ Pre-alpha: no binary releases yet. The flow below summarizes the typical user journey post-v1.0; for now you need to **build from source** (see [Installation](#-kurulum--installation)).
+
+After installing, here are the **5 steps** to follow when first opening D-Transfer:
+
+1. **Download & install** — Once v1.0 ships: grab the MSI (Windows) or AppImage / `.deb` (Linux) from GitHub Releases → double-click to install. Today: run `pnpm tauri:build` per the [Installation](#-kurulum--installation) section.
+2. **Open the app** — On first launch, `settings.json` + `queue.db` + (opt-in) `audit.db` are created under the user-data dir (Windows: `%APPDATA%\d-transfer\`, Linux: `~/.config/d-transfer/`). Pick theme, language (TR/EN), and a `LimitProfile` (LowMemory / Desktop / Workstation / Server / Custom) in **Settings**.
+3. **Define your first profile** — In the left sidebar: **+ Profile** → choose SFTP / Local → enter host, port, username, password or private key. **Test connection** runs a capability probe; the password is stored in the OS-native vault (Credential Manager / Keychain / Secret Service); the UI never sees a plaintext secret.
+4. **Start your first transfer** — Dual pane: left = local, right = remote. Select a file → **Transfer** button (drag-drop lands in v1.0). The task enters the queue; `ProgressAggregator` emits 250 ms batched events; writes go through `.dtransfer_tmp` → fsync → atomic rename.
+5. **Verify** — When the transfer finishes, the state transitions `Verifying → Completed` (with checksum mode, hashes are compared). Power-cut drill: kill the app mid-transfer → reopen → the task deterministically reverts `Active → Queued`; no half-written file remains.
+
+> 💡 Detailed setting / schema reference: [`dtransfer-teknik-dokuman-v2_1.md`](./dtransfer-teknik-dokuman-v2_1.md) — Section 9 (queue), Section 13 (encryption), Section 30 (limits).
+> 💡 If you hit a problem: **Settings → Diagnostics → Bundle export** (PII-filtered `tracing` output + `RuntimeMetrics` snapshot).
 
 </details>
 
@@ -310,6 +359,49 @@ pnpm tauri:build # release MSI / AppImage / deb
 ```
 
 Çıktı / Output: `src-tauri/target/release/bundle/` altında.
+
+---
+
+## 🛡️ Güvenlik Tarama / Security Scan
+
+> 🇹🇷 **Henüz release yok** — bağımsız tarama raporları **v1.0 release ile birlikte yayınlanacaktır**. Aşağıdaki checklist v1.0 öncesi tamamlanması planlanan güvenlik doğrulama adımlarını listeler.
+>
+> 🇬🇧 **No releases yet** — independent scan reports will be **published alongside the v1.0 release**. The checklist below lists the security verification steps planned before v1.0.
+
+### Planlanan doğrulamalar / Planned verifications (v1.0)
+
+| Katman / Layer | Durum / Status | Detay / Detail |
+|---|---|---|
+| 🔍 **VirusTotal** (MSI / AppImage / `.deb` / `.rpm`) | 📅 planned | Tüm 4 installer artifact'ı VT'ye yüklenip rapor URL'leri README + RELEASE_NOTES'a eklenecek / All 4 installer artifacts uploaded to VT; report URLs added to README + RELEASE_NOTES |
+| 🖊 **Code signing** (Windows MSI) | 📅 planned | SignPath FOSS başvurusu v1.0 öncesi tamamlanacak — SmartScreen "Bilinmeyen yayıncı" uyarısı düşer / SignPath FOSS application before v1.0 — drops SmartScreen "Unknown publisher" warning |
+| 🐧 **Linux paket imzalama** | 📅 planned | `.deb` + AppImage detached GPG signature (Ed25519); release sayfasında public key + verification snippet / `.deb` + AppImage detached GPG signature (Ed25519); release page lists pubkey + verification snippet |
+| 🦀 **`cargo audit` + `cargo deny`** | 🚧 manuel / manual | CI pipeline'a wire'lanacak; her release tag öncesi run / Wired into CI; runs before each release tag |
+| 🧪 **Bağımsız AV doğrulama** (Kaspersky / Defender) | 📅 planned | Lisanslı Kaspersky + Defender real-time scan, kanıt screenshot'ı / Licensed Kaspersky + Defender real-time scan, evidence screenshot |
+| 🛡 **Sandbox dynamic analysis** | 📅 planned | VT runtime + Cuckoo benzeri — installer dropped-file + network behavior raporu / VT runtime + Cuckoo-like — installer dropped-file + network behavior report |
+| 🔐 **Auto-update integrity** | 📅 planned | Ed25519 signature + anti-rollback transaction (Bölüm 27) — release imzası release dışı kanaldan yayımlanır / Ed25519 signature + anti-rollback transaction (Section 27) — release pubkey published out-of-band |
+
+### Mevcut güvenlik zemin / Current security baseline
+
+Kaynak kod düzeyinde, v1.0'a kadar **mevcut** olan güvenlik kontrolleri:
+
+- ✅ **OS-native credential vault** — parolalar Windows Credential Manager / macOS Keychain / Linux Secret Service'te; `keyring` crate üzerinden
+- ✅ **`Redacted<T>` PII koruması** — `Debug` impl'i sırlar yerine `[REDACTED]` yazar; `tracing` `credentials=off` filtresi ile log'larda da maskelenir
+- ✅ **Audit trail masking** — opt-in `audit.db`, granüler `MaskingEngine` (IP / path / filename / username), presigned URL her zaman redact
+- ✅ **GPL-3.0-or-later** — copyleft koruma + GPLv3 patent grant + TiVo-clause; türev çalışmalar aynı şartlarda açık kalır
+
+<details>
+<summary>🇬🇧 Security Scan — current baseline (English)</summary>
+
+At the source-code level, the following security controls **exist today** and carry through to v1.0:
+
+- ✅ **OS-native credential vault** — passwords live in Windows Credential Manager / macOS Keychain / Linux Secret Service via the `keyring` crate
+- ✅ **`Redacted<T>` PII protection** — its `Debug` impl prints `[REDACTED]` instead of the secret; combined with the `tracing` `credentials=off` filter, secrets are also masked in logs
+- ✅ **Audit trail masking** — opt-in `audit.db`, granular `MaskingEngine` (IP / path / filename / username), presigned URLs always redacted
+- ✅ **GPL-3.0-or-later** — copyleft protection + GPLv3 patent grant + TiVo-clause; derivative works stay open under the same terms
+
+> Independent third-party scan reports (VirusTotal, code signing, sandbox dynamic analysis) **will be available at the v1.0 release**.
+
+</details>
 
 ---
 
