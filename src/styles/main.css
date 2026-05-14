@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+ * DTransfer — Theme Tokens (Bölüm 19.1)
+ * ---------------------------------------------------------------------------
+ * Tüm renkler iki katmanlıdır:
+ *   1) Semantic token  (--color-surface-base, --color-fg-default, ...)
+ *   2) Tailwind v4 @theme registration  (bg-surface-base, text-fg-default)
+ *
+ * Component katmanı asla raw hex KULLANMAZ. Yalnızca token isimleri.
+ * --------------------------------------------------------------------------- */
+
+@theme {
+  /* Surface */
+  --color-surface-base: light-dark(#ffffff, #0d1117);
+  --color-surface-raised: light-dark(#f6f7f9, #161b22);
+  --color-surface-overlay: light-dark(#ffffff, #1c2128);
+  --color-surface-sunken: light-dark(#eef1f4, #010409);
+
+  /* Foreground */
+  --color-fg-default: light-dark(#1f2328, #e6edf3);
+  --color-fg-muted: light-dark(#59636e, #8d96a0);
+  --color-fg-subtle: light-dark(#8d96a0, #6e7681);
+  --color-fg-inverse: light-dark(#ffffff, #0d1117);
+
+  /* Border */
+  --color-border-default: light-dark(#d1d9e0, #30363d);
+  --color-border-muted: light-dark(#e4e8eb, #21262d);
+  --color-border-strong: light-dark(#8d96a0, #6e7681);
+
+  /* Brand accent — D Brand green */
+  --color-accent-default: light-dark(#00b248, #00ff66);
+  --color-accent-emphasis: light-dark(#008c3a, #00cc52);
+  --color-accent-subtle: light-dark(#d9f5e3, #0a2a16);
+
+  /* Status — ikon + sayı 4'lü disipliniyle eşleşir (Bölüm 22.2) */
+  --color-status-success: light-dark(#1a7f37, #3fb950);
+  --color-status-warning: light-dark(#9a6700, #d29922);
+  --color-status-danger: light-dark(#cf222e, #f85149);
+  --color-status-info: light-dark(#0969da, #58a6ff);
+  --color-status-neutral: light-dark(#59636e, #8d96a0);
+
+  /* Mono font stack — sistem fallback yasak (Bölüm 19.5) */
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Explicit dark/light override hooks — OS preference yerine kullanıcı seçimi
+ * Bölüm 19.3 — Tema kullanıcı tarafından açıkça seçilir. */
+.theme-light {
+  color-scheme: light;
+}
+
+.theme-dark {
+  color-scheme: dark;
+}
+
+/* Native HTML widget yasaklı (Bölüm 19.5). Headless Reka UI'a kadar
+ * default kenarları normalize. */
+@layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "ss02", "calt", "liga";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden; /* Tauri pencere içi scroll yok — pane'lar kendi scroll'unu yönetir */
+  }
+
+  /* Drag region — title bar tarafında işaretlenir */
+  [data-tauri-drag-region] {
+    -webkit-app-region: drag;
+    user-select: none;
+  }
+
+  [data-tauri-drag-region] button,
+  [data-tauri-drag-region] a,
+  [data-tauri-drag-region] input {
+    -webkit-app-region: no-drag;
+  }
+}

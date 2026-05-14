@@ -1,0 +1,37 @@
+/* JetBrains Mono — locally packaged per Bölüm 19.5 ("system fallback yasak").
+ *
+ * Font dosyaları `public/fonts/` altına manuel düşürülür:
+ *   - JetBrainsMono-Regular.woff2
+ *   - JetBrainsMono-Medium.woff2
+ *   - JetBrainsMono-Bold.woff2
+ *
+ * Kaynak: https://www.jetbrains.com/lp/mono/
+ * Lisans: SIL Open Font License 1.1 (font'un kendi lisansı, projeninkinden bağımsız)
+ *
+ * `font-display: block` — FOIT (Flash of Invisible Text) bilinçli tercih:
+ *   sistem monospace fallback'i tutarsız render üretir; kısa süreli blank tercih edilir.
+ */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}

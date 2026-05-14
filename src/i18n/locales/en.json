@@ -1,0 +1,189 @@
+{
+  "app": {
+    "name": "DTransfer",
+    "tagline": "Deterministic, crash-resilient file transfer client"
+  },
+  "shell": {
+    "menu": {
+      "file": "File",
+      "edit": "Edit",
+      "view": "View",
+      "transfer": "Transfer",
+      "help": "Help"
+    },
+    "actions": {
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "newProfile": "New profile",
+      "settings": "Settings"
+    }
+  },
+  "panes": {
+    "local": "Local",
+    "remote": "Remote",
+    "noConnection": "Not connected yet",
+    "noConnectionHint": "Pick a profile from the left or create a new one"
+  },
+  "localBrowser": {
+    "columns": {
+      "name": "Name",
+      "size": "Size",
+      "modified": "Modified"
+    },
+    "actions": {
+      "refresh": "Refresh",
+      "up": "Up",
+      "home": "Home",
+      "toggleHidden": "Show hidden files"
+    },
+    "emptyDir": "This directory is empty",
+    "errorPrefix": "Error"
+  },
+  "remoteBrowser": {
+    "noProfileSelected": "Pick a profile from the left",
+    "connecting": "Connecting…",
+    "actions": {
+      "refresh": "Refresh",
+      "up": "Up",
+      "toggleHidden": "Show hidden files",
+      "disconnect": "Disconnect"
+    },
+    "emptyDir": "This directory is empty",
+    "errorPrefix": "Error"
+  },
+  "queue": {
+    "title": "Transfer queue",
+    "empty": "No transfers in queue",
+    "activeCount": "Active: {count}",
+    "queuedCount": "Queued: {count}",
+    "state": {
+      "queued": "Queued",
+      "active": "Active",
+      "verifying": "Verifying",
+      "finalizing": "Finalizing",
+      "paused": "Paused",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "skipped": "Skipped"
+    }
+  },
+  "errors": {
+    "network": "Network error",
+    "auth": "Authentication failed",
+    "permission": "Unauthorized",
+    "notFound": "Not found",
+    "conflict": "Conflict",
+    "rateLimit": "Rate limited",
+    "serverError": "Server error",
+    "integrity": "Integrity check failed",
+    "cancelled": "Cancelled",
+    "unknown": "Unknown error"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Application preferences",
+    "sections": {
+      "appearance": "Appearance",
+      "transfers": "Transfers",
+      "paths": "Paths",
+      "advanced": "Advanced",
+      "privacy": "Privacy & Updates"
+    },
+    "fields": {
+      "defaultDownloadDir": "Default download directory",
+      "defaultDownloadDirHelp": "Falls back to the OS default if empty.",
+      "maxConcurrentTransfers": "Max concurrent transfers",
+      "maxConcurrentTransfersHelp": "1 = sequential. Higher values dispatch the queue in parallel (active in Phase 4).",
+      "defaultChunkSizeMb": "Default chunk size (MiB)",
+      "defaultChunkSizeMbHelp": "8–32 typical; too small floods syscalls, too large explodes RAM.",
+      "defaultMaxInflightMb": "Inflight RAM cap (MiB)",
+      "defaultMaxInflightMbHelp": "Caps adapter parallel-chunk RAM consumption.",
+      "bandwidthLimitMbps": "Bandwidth limit (Mbps)",
+      "bandwidthLimitMbpsHelp": "0 = unlimited.",
+      "verifyChecksum": "Checksum algorithm",
+      "verifyChecksumHelp": "Integrity verification after transfer.",
+      "fsyncPolicy": "fsync policy",
+      "fsyncPolicyHelp": "Data integrity guarantee during power-cut.",
+      "autoUpdate": "Auto-update",
+      "autoUpdateHelp": "Anti-rollback + Ed25519-signed updates.",
+      "telemetry": "Telemetry",
+      "telemetryHelp": "Safer to keep off. KVKK/GDPR-conscious — off by default."
+    },
+    "values": {
+      "checksumNone": "None",
+      "checksumSha256": "SHA-256 (recommended)",
+      "checksumXxHash3": "xxHash3 (fast, non-cryptographic)",
+      "fsyncNone": "None (fast, risky)",
+      "fsyncDataOnly": "Data only (recommended)",
+      "fsyncFull": "Full (data + metadata)"
+    },
+    "actions": {
+      "open": "Settings",
+      "close": "Close",
+      "chooseDir": "Choose folder…",
+      "clearDir": "Clear",
+      "reset": "Reset to defaults"
+    },
+    "theme": {
+      "label": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "locale": {
+      "label": "Language",
+      "tr": "Türkçe",
+      "en": "English"
+    }
+  },
+  "engine": {
+    "running": "Engine running",
+    "stopped": "Engine stopped",
+    "subscribers": "subscribers"
+  },
+  "profiles": {
+    "title": "Profiles",
+    "new": "New profile",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteConfirm": "Are you sure you want to delete this profile?",
+    "noProfilesYet": "No profiles yet",
+    "fields": {
+      "name": "Name",
+      "protocol": "Protocol",
+      "host": "Host",
+      "port": "Port",
+      "username": "Username",
+      "password": "Password",
+      "remoteRoot": "Remote root",
+      "localRoot": "Local root",
+      "authMethod": "Authentication"
+    },
+    "protocols": {
+      "local": "Local",
+      "sftp": "SFTP",
+      "s3": "S3",
+      "webdav": "WebDAV"
+    },
+    "auth": {
+      "none": "None",
+      "password": "Password",
+      "publicKey": "Public key"
+    },
+    "actions": {
+      "test": "Test connection",
+      "testing": "Testing…",
+      "testSuccess": "Success",
+      "testFailed": "Failed",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "errors": {
+      "nameRequired": "Name is required",
+      "hostRequired": "Host is required",
+      "usernameRequired": "Username is required",
+      "localRootRequired": "Local root is required"
+    }
+  }
+}

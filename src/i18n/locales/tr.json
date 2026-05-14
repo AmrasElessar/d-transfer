@@ -1,0 +1,189 @@
+{
+  "app": {
+    "name": "DTransfer",
+    "tagline": "Deterministik, çökmelere dayanıklı dosya transfer istemcisi"
+  },
+  "shell": {
+    "menu": {
+      "file": "Dosya",
+      "edit": "Düzenle",
+      "view": "Görünüm",
+      "transfer": "Transfer",
+      "help": "Yardım"
+    },
+    "actions": {
+      "connect": "Bağlan",
+      "disconnect": "Bağlantıyı kes",
+      "newProfile": "Yeni profil",
+      "settings": "Ayarlar"
+    }
+  },
+  "panes": {
+    "local": "Yerel",
+    "remote": "Uzak",
+    "noConnection": "Henüz bağlanılmadı",
+    "noConnectionHint": "Soldan bir profil seç ya da yeni bir profil oluştur"
+  },
+  "localBrowser": {
+    "columns": {
+      "name": "Ad",
+      "size": "Boyut",
+      "modified": "Değiştirilme"
+    },
+    "actions": {
+      "refresh": "Yenile",
+      "up": "Yukarı",
+      "home": "Ev",
+      "toggleHidden": "Gizli dosyaları göster"
+    },
+    "emptyDir": "Bu dizinde dosya yok",
+    "errorPrefix": "Hata"
+  },
+  "remoteBrowser": {
+    "noProfileSelected": "Sol panelden bir profil seç",
+    "connecting": "Bağlanılıyor…",
+    "actions": {
+      "refresh": "Yenile",
+      "up": "Yukarı",
+      "toggleHidden": "Gizli dosyaları göster",
+      "disconnect": "Bağlantıyı kes"
+    },
+    "emptyDir": "Bu dizinde dosya yok",
+    "errorPrefix": "Hata"
+  },
+  "queue": {
+    "title": "Transfer kuyruğu",
+    "empty": "Kuyrukta transfer yok",
+    "activeCount": "Aktif: {count}",
+    "queuedCount": "Bekleyen: {count}",
+    "state": {
+      "queued": "Kuyrukta",
+      "active": "Aktif",
+      "verifying": "Doğrulanıyor",
+      "finalizing": "Sonlandırılıyor",
+      "paused": "Duraklatıldı",
+      "completed": "Tamamlandı",
+      "failed": "Başarısız",
+      "cancelled": "İptal edildi",
+      "skipped": "Atlandı"
+    }
+  },
+  "errors": {
+    "network": "Ağ hatası",
+    "auth": "Kimlik doğrulama başarısız",
+    "permission": "Yetkisiz",
+    "notFound": "Bulunamadı",
+    "conflict": "Çakışma",
+    "rateLimit": "Hız sınırı",
+    "serverError": "Sunucu hatası",
+    "integrity": "Bütünlük doğrulanamadı",
+    "cancelled": "İptal edildi",
+    "unknown": "Bilinmeyen hata"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "subtitle": "Uygulama tercihleri",
+    "sections": {
+      "appearance": "Görünüm",
+      "transfers": "Transferler",
+      "paths": "Yollar",
+      "advanced": "Gelişmiş",
+      "privacy": "Gizlilik & Güncelleme"
+    },
+    "fields": {
+      "defaultDownloadDir": "Varsayılan indirme klasörü",
+      "defaultDownloadDirHelp": "Boşsa OS varsayılanı kullanılır.",
+      "maxConcurrentTransfers": "Eş zamanlı transfer üst sınırı",
+      "maxConcurrentTransfersHelp": "1 = sıralı. Yüksek değer paralel kuyruk dispatch eder (Faz 4'te aktifleşir).",
+      "defaultChunkSizeMb": "Varsayılan chunk boyutu (MiB)",
+      "defaultChunkSizeMbHelp": "8–32 arası tipik; çok küçük chunk syscall fırtınası, çok büyük RAM patlaması.",
+      "defaultMaxInflightMb": "Inflight RAM üst sınırı (MiB)",
+      "defaultMaxInflightMbHelp": "Adapter'ların paralel chunk RAM tüketimi cap'i.",
+      "bandwidthLimitMbps": "Bant genişliği limiti (Mbps)",
+      "bandwidthLimitMbpsHelp": "0 = sınırsız.",
+      "verifyChecksum": "Checksum algoritması",
+      "verifyChecksumHelp": "Transfer sonrası bütünlük doğrulaması.",
+      "fsyncPolicy": "fsync politikası",
+      "fsyncPolicyHelp": "Power-cut sırasında veri bütünlüğü garantisi.",
+      "autoUpdate": "Otomatik güncelleme",
+      "autoUpdateHelp": "Anti-rollback + Ed25519 imzalı güncellemeler.",
+      "telemetry": "Telemetri",
+      "telemetryHelp": "Kapalı tutmak güvenlidir. KVKK/GDPR conscious tasarım — varsayılan kapalı."
+    },
+    "values": {
+      "checksumNone": "Yok",
+      "checksumSha256": "SHA-256 (önerilen)",
+      "checksumXxHash3": "xxHash3 (hızlı, kriptografik değil)",
+      "fsyncNone": "Yok (hızlı, riskli)",
+      "fsyncDataOnly": "Veri (önerilen)",
+      "fsyncFull": "Tam (data + metadata)"
+    },
+    "actions": {
+      "open": "Ayarlar",
+      "close": "Kapat",
+      "chooseDir": "Klasör seç…",
+      "clearDir": "Temizle",
+      "reset": "Varsayılana dön"
+    },
+    "theme": {
+      "label": "Tema",
+      "light": "Açık",
+      "dark": "Koyu",
+      "system": "Sistem"
+    },
+    "locale": {
+      "label": "Dil",
+      "tr": "Türkçe",
+      "en": "English"
+    }
+  },
+  "engine": {
+    "running": "Engine çalışıyor",
+    "stopped": "Engine durdu",
+    "subscribers": "abone"
+  },
+  "profiles": {
+    "title": "Profiller",
+    "new": "Yeni profil",
+    "edit": "Düzenle",
+    "delete": "Sil",
+    "deleteConfirm": "Bu profili silmek istediğine emin misin?",
+    "noProfilesYet": "Henüz profil yok",
+    "fields": {
+      "name": "Ad",
+      "protocol": "Protokol",
+      "host": "Sunucu",
+      "port": "Port",
+      "username": "Kullanıcı adı",
+      "password": "Parola",
+      "remoteRoot": "Uzak dizin",
+      "localRoot": "Yerel dizin",
+      "authMethod": "Kimlik doğrulama"
+    },
+    "protocols": {
+      "local": "Yerel",
+      "sftp": "SFTP",
+      "s3": "S3",
+      "webdav": "WebDAV"
+    },
+    "auth": {
+      "none": "Yok",
+      "password": "Parola",
+      "publicKey": "Genel anahtar"
+    },
+    "actions": {
+      "test": "Bağlantıyı test et",
+      "testing": "Test ediliyor…",
+      "testSuccess": "Başarılı",
+      "testFailed": "Başarısız",
+      "save": "Kaydet",
+      "cancel": "İptal"
+    },
+    "errors": {
+      "nameRequired": "Ad zorunlu",
+      "hostRequired": "Sunucu zorunlu",
+      "usernameRequired": "Kullanıcı adı zorunlu",
+      "localRootRequired": "Yerel dizin zorunlu"
+    }
+  }
+}
