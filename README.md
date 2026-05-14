@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="src-tauri/icons/icon.png" width="128" alt="D-Transfer logo" />
-
 # D-Transfer
 
 **Deterministic, crash-resilient transfer infrastructure client**
@@ -30,24 +28,24 @@
 
 ## 📌 Kısaca
 
-D-Transfer, **kararlılığı** ön plana alan bir masaüstü dosya transfer istemcisidir. SFTP, S3 (R2/B2 dahil), WebDAV ve yerel dosya sistemi adaptörlerini **tek bir Rust motorunda** birleştirir. Power-cut'ta yarım kalan transfer kaldığı offset'ten devam eder; her chunk doğrulanır; kuyruk crash sonrası kalıcıdır.
+D-Transfer, **deterministik ve crash-resilient** bir masaüstü dosya transfer istemcisidir. SFTP, S3 (R2/B2 dahil), WebDAV ve yerel dosya sistemi adaptörlerini **tek bir Rust motorunda** birleştirmeyi hedefler — adapter sadece protokole özgü kısmı (auth, listing, presigned URL) yapar; retry, multipart, checksum ve encryption motor seviyesinde paylaşılır.
 
-**Tauri v2** üzerine yazıldı — Rust core + WebView2 / WebKitGTK — Electron tabanlı alternatiflerden **kat kat hafif** (hedef ~10 MB binary). FileZilla'nın yerini hedeflemez; **deterministik transfer altyapısı** rolünü hedefler.
+**Tauri v2** üzerine yazıldı — Rust core + WebView2 (Windows) / WebKitGTK (Linux). Binary boyutu ve RAM ayak izi tasarım kısıtlarıdır; kesin sayılar v1.0 release'de ölçülüp paylaşılacaktır.
 
-**GPL-3.0-or-later** lisanslı bir D Brand projesidir. Windows 10/11 + Linux (Ubuntu 22.04+, Fedora 38+, Debian 12+) birinci sınıf; macOS portu topluluk katkısına açıktır.
+**GPL-3.0-or-later** lisanslı bir D Brand projesidir. Windows 10/11 + Linux (Ubuntu 22.04+, Fedora 38+, Debian 12+) birinci sınıf hedef; macOS portu topluluk katkısına açıktır.
 
-> ⚠️ **Pre-alpha:** Mimari spec donmuş (v2.1), Faz 1-4 + sistem katmanları implemented. **Henüz release yok.** Roadmap aşağıda.
+> ⚠️ **Pre-alpha:** Mimari spec v2.1'de donmuş, Faz 1-4 + sistem katmanları kod tarafında **mevcut**. Atomic finalization, crash recovery, queue persistence ve OS-native credential vault **çalışıyor**; resume, per-chunk hash, multipart, S3/WebDAV adapter ve encryption **planlı** (roadmap aşağıda). **Henüz release yok.**
 
 <details>
 <summary>🇬🇧 At a glance (English)</summary>
 
-D-Transfer is a desktop file-transfer client built around **durability**. SFTP, S3 (incl. R2/B2), WebDAV and a local-filesystem adapter share **one Rust engine**. Half-finished transfers resume from the last verified offset; every chunk is verified; the queue survives crashes.
+D-Transfer is a **deterministic and crash-resilient** desktop file-transfer client. It aims to share SFTP, S3 (incl. R2/B2), WebDAV and a local-filesystem adapter under **one Rust engine** — adapters only handle the protocol-specific parts (auth, listing, presigned URL), while retry, multipart, checksum, and encryption live in the engine.
 
-Built on **Tauri v2** — Rust core + WebView2 / WebKitGTK — it aims to be **dramatically lighter** than Electron-based alternatives (~10 MB binary target). It does not try to be a FileZilla rewrite; it targets the **deterministic transfer infrastructure** role.
+Built on **Tauri v2** — Rust core + WebView2 (Windows) / WebKitGTK (Linux). Binary size and RAM footprint are design constraints; concrete numbers will be measured and published at the v1.0 release.
 
-It is a **GPL-3.0-or-later** licensed D Brand project. Windows 10/11 + Linux (Ubuntu 22.04+, Fedora 38+, Debian 12+) are first-class; a macOS port is open to community contributions.
+It is a **GPL-3.0-or-later** licensed D Brand project. Windows 10/11 + Linux (Ubuntu 22.04+, Fedora 38+, Debian 12+) are first-class targets; a macOS port is open to community contributions.
 
-> ⚠️ **Pre-alpha:** The architecture spec is frozen (v2.1) and Phases 1-4 + system layers are implemented. **No releases yet.** Roadmap below.
+> ⚠️ **Pre-alpha:** Spec v2.1 is frozen; Phases 1-4 + system layers exist in code. Atomic finalization, crash recovery, queue persistence, and the OS-native credential vault **work today**; resume, per-chunk hash, multipart, S3/WebDAV adapters, and encryption are **planned** (roadmap below). **No releases yet.**
 
 </details>
 
@@ -413,8 +411,8 @@ Pre-alpha — get notified when the first release ships.
 
 **GPL-3.0-or-later** © Orhan Engin OKAY — bkz / see [LICENSE](./LICENSE)
 
-> 🇹🇷 D-Transfer GPL-3 lisanslıdır çünkü kopyalanan/türetilen GPL bileşenlerle uyumluluk gerekir ve copyleft, future fork'ların da açık kaynak kalmasını garanti eder.
-> 🇬🇧 D-Transfer is GPL-3 licensed for compatibility with derived/used GPL components, and because copyleft guarantees that future forks stay open source.
+> 🇹🇷 GPL-3.0-or-later seçimi (Bölüm 40): **copyleft koruma** — türev çalışmalar aynı şartlarda açık kalır; D Brand felsefesi (Privacy First, Local by Default, Open Source) ile uyumludur; FileZilla'nın GPLv2 mirasıyla aynı ailededir, GPLv3'ün **patent grant** ve **TiVo-clause** hükümleriyle modernleştirilmiştir.
+> 🇬🇧 Why GPL-3.0-or-later (Section 40): **copyleft protection** — derivative works stay open under the same terms; aligned with D Brand philosophy (Privacy First, Local by Default, Open Source); same family as FileZilla's GPLv2 lineage, modernized with GPLv3's **patent grant** and **TiVo-clause**.
 
 ---
 
