@@ -64,3 +64,6 @@ coverage/
 playwright-report/
 playwright/.cache/
 test-results/
+
+# Claude Code project-local profile (kept local)
+.claude/
